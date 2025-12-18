@@ -4,10 +4,22 @@ import tensorflow as tf
 from tensorflow.keras.models import load_model
 from PIL import Image
 
-st.set_page_config(page_title="AI Crop Disease Prediction", layout="centered")
+# -------------------------------------------------
+# PAGE CONFIG
+# -------------------------------------------------
+st.set_page_config(
+    page_title="AI Crop Disease Prediction",
+    layout="centered"
+)
 
+# -------------------------------------------------
+# MODEL PATH
+# -------------------------------------------------
 MODEL_PATH = "crop_disease_model.keras"
 
+# -------------------------------------------------
+# CLASS LABELS (FIXED ORDER)
+# -------------------------------------------------
 CLASS_NAMES = [
     "Apple___Apple_scab","Apple___Black_rot","Apple___Cedar_apple_rust","Apple___healthy",
     "Blueberry___healthy","Cherry___Powdery_mildew","Cherry___healthy",
@@ -24,37 +36,61 @@ CLASS_NAMES = [
     "Tomato___Tomato_mosaic_virus","Tomato___healthy"
 ]
 
+# -------------------------------------------------
+# LOAD MODEL (CRITICAL FIX)
+# -------------------------------------------------
 @st.cache_resource
 def load_trained_model():
-    # compile=False avoids Keras version mismatch issues
-    model = load_model(MODEL_PATH, compile=False)
-    return model
+    return load_model(
+        MODEL_PATH,
+        compile=False,
+        safe_mode=False   # 🔥 FIX for Dense input mismatch
+    )
 
 model = load_trained_model()
 
+# -------------------------------------------------
+# PREDICTION FUNCTION
+# -------------------------------------------------
 def predict_disease(img):
     img = img.resize((224, 224))
-    img = np.array(img) / 255.0
-    img = np.expand_dims(img, axis=0)
+    img_array = np.array(img) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
 
-    preds = model.predict(img)
-    idx = int(np.argmax(preds))
-    confidence = float(np.max(preds))
+    predictions = model.predict(img_array)
+    class_index = int(np.argmax(predictions))
+    confidence = float(np.max(predictions))
 
-    return CLASS_NAMES[idx], confidence
+    return CLASS_NAMES[class_index], confidence
 
+# -------------------------------------------------
+# UI
+# -------------------------------------------------
 st.title("🌱 AI-Driven Crop Disease Prediction System")
-st.write("Upload a leaf image to detect crop disease using AI.")
+st.write("Upload a leaf image to detect crop disease using deep learning.")
 
-uploaded_file = st.file_uploader("Upload leaf image", ["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader(
+    "Upload leaf image",
+    type=["jpg", "jpeg", "png"]
+)
 
-if uploaded_file:
+# -------------------------------------------------
+# RUN PREDICTION
+# -------------------------------------------------
+if uploaded_file is not None:
     image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, use_column_width=True)
+    st.image(image, caption="Uploaded Leaf Image", use_column_width=True)
 
     with st.spinner("Analyzing crop health..."):
         disease, confidence = predict_disease(image)
 
+    st.subheader("🧪 Prediction Result")
     st.success(f"Detected Disease: {disease}")
     st.info(f"Confidence: {confidence * 100:.2f}%")
     st.warning(f"10-Day Risk (Estimated): {min(confidence * 1.3, 1.0) * 100:.2f}%")
+
+# -------------------------------------------------
+# FOOTER
+# -------------------------------------------------
+st.markdown("---")
+st.caption("AI-Enabled Crop Disease Prediction | Streamlit Cloud Deployment")
